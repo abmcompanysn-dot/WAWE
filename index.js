@@ -142,6 +142,10 @@ async function handleWebhookRequest(req, res) {
 
     // 3. Renvoyer la réponse à WhatsAuto dans le format attendu
     console.log(`[${transactionId}] Envoi de la réponse finale à WhatsAuto: "${replyMessage}"`);
+    // Mettre à jour le statut du log en cas de succès
+    if (logEntry.status === 'En cours') {
+      logEntry.status = 'Terminé';
+    }
     logEntry.response.message = replyMessage;
     res.status(200).json({
       reply: replyMessage
