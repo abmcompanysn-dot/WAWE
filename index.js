@@ -116,10 +116,13 @@ app.route('/api/webhook')
       console.log(`[${transactionId}] Réponse reçue de Google Apps Script:`, JSON.stringify(scriptResponse));
 
       // Vérifier si la réponse du script est valide
-      if (scriptResponse && scriptResponse.status === 'success' && typeof scriptResponse.reply !== 'undefined') {
-        // S'assurer que la réponse n'est jamais null ou vide, ce qui peut causer des erreurs dans WhatsAuto.
-        // On envoie un espace si la réponse est vide ou null.
-        replyMessage = scriptResponse.reply || " ";
+      if (scriptResponse && scriptResponse.status === 'success' && typeof scriptResponse.reply !== 'undefined' && scriptResponse.reply !== null) {
+        // Si la réponse du script est une chaîne vide ou composée uniquement d'espaces,
+        // on envoie une réponse minimale (un point) pour éviter l'erreur "null" de WhatsAuto.
+        replyMessage = String(scriptResponse.reply).trim() === '' ? '.' : scriptResponse.reply;
+      } else {
+        // Si le script n'a pas renvoyé de réponse valide, on ne renvoie rien d'utile pour l'utilisateur.
+        replyMessage = '.'; // On envoie un point pour s'assurer que la réponse n'est jamais vide.
       }
     } catch (scriptError) {
       if (scriptError.code === 'ECONNABORTED') {
