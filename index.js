@@ -109,16 +109,16 @@ async function handleWebhookRequest(req, res) {
     } catch (scriptError) {
       if (scriptError.code === 'ECONNABORTED') {
         console.error(`[${transactionId}] ERREUR: Le script Google Apps n'a pas répondu dans le temps imparti (timeout).`);
-        logEntry.erreur = "Timeout lors de l'appel à Google Apps Script.";
+        logEntry.error = "Timeout lors de l'appel à Google Apps Script.";
       }
       console.error(`[${transactionId}] ERREUR lors de l'appel à Google Apps Script:`, scriptError.message);
-      logEntry.erreur = logEntry.erreur || scriptError.message;
+      logEntry.error = logEntry.error || scriptError.message;
     }
 
     // 3. Renvoyer la réponse à WhatsAuto dans le format attendu
     console.log(`[${transactionId}] Envoi de la réponse finale à WhatsAuto: "${replyMessage}"`);
-    logEntry.reponse.message = replyMessage;
-    logEntry.statut = 'Terminé';
+    logEntry.response.message = replyMessage;
+    logEntry.status = 'Terminé';
     res.status(200).json({
       reply: replyMessage
     });
@@ -127,9 +127,9 @@ async function handleWebhookRequest(req, res) {
   } catch (error) {
     const errorMsg = error.message;
     console.error(`[${transactionId}] ERREUR globale dans le traitement du webhook:`, errorMsg);
-    logEntry.statut = 'Erreur';
-    logEntry.erreur = errorMsg;
-    logEntry.reponse.message = "Une erreur interne est survenue.";
+    logEntry.status = 'Erreur';
+    logEntry.error = errorMsg;
+    logEntry.response.message = "Une erreur interne est survenue.";
     res.status(200).json({
       reply: "Une erreur interne est survenue."
     });
@@ -153,5 +153,10 @@ app.route('/api/webhook')
   })
   .post(handleWebhookRequest);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Serveur actif sur http://localhost:${PORT}`));
+// Exporter l'application pour Vercel.
+// La ligne app.listen() est retirée car Vercel gère le port d'écoute.
+module.exports = app;
+
+// On garde cette partie commentée pour pouvoir tester facilement en local si besoin.
+// const PORT = process.env.PORT || 3000;
+// app.listen(PORT, () => console.log(`Serveur actif sur http://localhost:${PORT}`));
