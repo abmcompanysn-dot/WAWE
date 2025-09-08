@@ -100,18 +100,18 @@
                     const timestamp = new Date(log.timestamp).toLocaleString('fr-FR');
 
                     // Définir la classe CSS pour le statut
-                    const statusClass = 'status-' + log.statut.toLowerCase().replace('é', 'e');
+                    const statusClass = 'status-' + log.status.toLowerCase().replace('é', 'e');
 
                     row.innerHTML = `
                         <td><pre>${log.transaction}</pre></td>
                         <td>${timestamp}</td>
                         <td>
-                            <b>Nom:</b> ${log.auteur.name}<br>
-                            <b>Tél:</b> ${log.auteur.phone}
+                            <b>Nom:</b> ${log.author.name}<br>
+                            <b>Tél:</b> ${log.author.phone}
                         </td>
-                        <td><pre>${log.requete.message}</pre></td>
-                        <td><pre>${log.reponse.message || ''}</pre></td>
-                        <td><div class="status ${statusClass}">${log.statut}</div></td>
+                        <td><pre>${log.request.message}</pre></td>
+                        <td><pre>${log.response.message || ''}</pre></td>
+                        <td><div class="status ${statusClass}">${log.status}</div></td>
                     `;
                 });
 
