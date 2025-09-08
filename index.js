@@ -91,6 +91,8 @@ async function handleWebhookRequest(req, res) {
       console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
       logEntry.status = 'Échoué';
       logEntry.error = errorMsg;
+      // On renvoie une réponse au format attendu par WhatsAuto pour un meilleur débogage
+      // au lieu de l'erreur "null", vous verrez ce message d'erreur dans WhatsAuto.
       return res.status(200).json({ reply: `ERREUR: ${errorMsg}` });
     }
 
