@@ -63,10 +63,6 @@ async function handleWebhookRequest(req, res) {
   const transactionId = Math.random().toString(36).substring(2, 9);
   console.log(`\n--- [Début de la transaction: ${transactionId}] ---`);
 
-  // Log de débogage pour voir si la requête arrive bien
-  console.log(`[${transactionId}] Requête reçue sur /api/webhook.`);
-  console.log(`[${transactionId}] Corps de la requête: ${JSON.stringify(req.body)}`);
-
   // Création de l'entrée pour notre interface de suivi
   const logEntry = {
     transaction: transactionId,
@@ -86,18 +82,15 @@ async function handleWebhookRequest(req, res) {
   };
 
   try {
-    // 1. Analyser le corps de la requête venant de WhatsAuto
     const { phone, message, sender } = req.body;
-    console.log(`[${transactionId}] Requête reçue de l'auteur: ${sender || 'Inconnu'} (${phone})`);
-    console.log(`[${transactionId}] Message original: "${message}"`);
+    console.log(`[${transactionId}] Requête reçue sur /api/webhook. Auteur: ${sender || 'Inconnu'} (${phone}), Message: "${message}"`);
 
+    // 1. Validation des données d'entrée
     if (!phone || !message) {
       const errorMsg = 'Requête invalide, "phone" ou "message" manquant.';
       console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
       logEntry.status = 'Échoué';
       logEntry.error = errorMsg;
-      // On renvoie une réponse au format attendu par WhatsAuto pour un meilleur débogage
-      // au lieu de l'erreur "null", vous verrez ce message d'erreur dans WhatsAuto.
       return res.status(200).json({ reply: `ERREUR: ${errorMsg}` });
     }
 
@@ -117,37 +110,31 @@ async function handleWebhookRequest(req, res) {
       console.log(`[${transactionId}] Réponse reçue de Google Apps Script:`, JSON.stringify(scriptResponse));
 
       // Vérifier si la réponse du script est valide
-      if (scriptResponse && scriptResponse.status === 'success' && typeof scriptResponse.reply !== 'undefined' && scriptResponse.reply !== null) {
-        // Si la réponse du script est une chaîne vide ou composée uniquement d'espaces,
-        // on envoie une réponse minimale (un point) pour éviter l'erreur "null" de WhatsAuto.
-        replyMessage = String(scriptResponse.reply).trim() === '' ? '.' : scriptResponse.reply;
+      if (scriptResponse?.status === 'success' && scriptResponse.reply) {
+        replyMessage = scriptResponse.reply;
       } else {
-        logEntry.error = "La réponse du script Google était invalide ou vide.";
-        // Si le script n'a pas renvoyé de réponse valide, on ne renvoie rien d'utile pour l'utilisateur.
-        replyMessage = '.'; // On envoie un point pour s'assurer que la réponse n'est jamais vide.
+        logEntry.error = `La réponse du script Google était invalide ou vide. Reçu: ${JSON.stringify(scriptResponse)}`;
+        replyMessage = '.'; // Réponse minimale pour éviter l'erreur "null" dans WhatsAuto
       }
     } catch (scriptError) {
-      if (scriptError.code === 'ECONNABORTED') {
-        console.error(`[${transactionId}] ERREUR: Le script Google Apps n'a pas répondu dans le temps imparti (timeout).`);
-        logEntry.error = "Timeout lors de l'appel à Google Apps Script.";
-        logEntry.status = 'Erreur';
-      }
-      console.error(`[${transactionId}] ERREUR lors de l'appel à Google Apps Script:`, scriptError.message);
-      // Ajouter plus de détails sur l'erreur axios si disponible
-      if (scriptError.response) {
-        logEntry.error = `Erreur ${scriptError.response.status}: ${scriptError.response.data}`;
-      } else {
-        logEntry.error = logEntry.error || scriptError.message;
-      }
       logEntry.status = 'Erreur';
+      if (scriptError.code === 'ECONNABORTED') {
+        const errorMsg = "Timeout lors de l'appel à Google Apps Script.";
+        console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
+        logEntry.error = errorMsg;
+      } else if (scriptError.response) {
+        const errorMsg = `Erreur ${scriptError.response.status} de Google: ${JSON.stringify(scriptError.response.data)}`;
+        console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
+        logEntry.error = errorMsg;
+      } else {
+        const errorMsg = `Erreur de connexion avec Google Script: ${scriptError.message}`;
+        console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
+        logEntry.error = errorMsg;
+      }
     }
 
     // 3. Renvoyer la réponse à WhatsAuto dans le format attendu
     console.log(`[${transactionId}] Envoi de la réponse finale à WhatsAuto: "${replyMessage}"`);
-    // Mettre à jour le statut du log en cas de succès
-    if (logEntry.status === 'En cours') {
-      logEntry.status = 'Terminé';
-    }
     logEntry.response.message = replyMessage;
     res.status(200).json({
       reply: replyMessage
@@ -166,6 +153,10 @@ async function handleWebhookRequest(req, res) {
     console.log(`--- [Fin de la transaction avec ERREUR: ${transactionId}] ---`);
   } finally {
     // Ajouter l'entrée de log au début du tableau et limiter sa taille
+    // Mettre à jour le statut final du log
+    if (logEntry.status === 'En cours') {
+      logEntry.status = 'Terminé';
+    }
     liveLogs.unshift(logEntry);
     if (liveLogs.length > MAX_LOGS) {
       liveLogs.pop();
