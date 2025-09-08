@@ -7,6 +7,8 @@ const axios = require('axios');
 const app = express();
 // Utiliser express.json() pour parser le corps des requêtes JSON.
 app.use(express.json());
+// Ajouter le middleware pour parser les corps de requête URL-encoded (envoyés par les formulaires HTML et certains webhooks)
+app.use(express.urlencoded({ extended: true }));
 
 // --- Interface de suivi en direct ---
 // Lire le fichier dashboard.html une seule fois au démarrage pour garantir sa disponibilité sur Vercel
