@@ -13,7 +13,8 @@ app.get('/', (req, res) => {
 
 // Route pour la vérification du webhook par Meta (Facebook)
 app.get('/webhook', (req, res) => {
-  const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+  // Le jeton de vérification est maintenant défini directement dans le code.
+  const VERIFY_TOKEN = '123456';
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
