@@ -42,6 +42,19 @@ app.get('/api/dashboard', (req, res) => {
   res.send(dashboardHtmlContent);
 });
 
+// Nouvelle route de débogage pour vérifier les variables d'environnement
+app.get('/api/test-env', (req, res) => {
+  console.log('Vérification de la variable d\'environnement APP_SCRIPT_URL.');
+  const url = process.env.APP_SCRIPT_URL;
+  if (url && url.startsWith('https://script.google.com')) {
+    console.log('Variable APP_SCRIPT_URL trouvée et valide:', url);
+    res.status(200).send(`<h1>SUCCÈS</h1><p>La variable d'environnement APP_SCRIPT_URL est bien configurée.</p><p>Valeur : ${url}</p>`);
+  } else {
+    console.error('ERREUR: Variable APP_SCRIPT_URL manquante ou invalide.');
+    res.status(500).send(`<h1>ERREUR</h1><p>La variable d'environnement APP_SCRIPT_URL n'est pas configurée ou est invalide sur Vercel.</p><p>Valeur actuelle : ${url}</p>`);
+  }
+});
+
 /**
  * Gère une requête entrante du webhook WhatsAuto.
  */
@@ -49,6 +62,10 @@ async function handleWebhookRequest(req, res) {
   // Création d'un ID unique pour chaque transaction pour un suivi facile dans les logs
   const transactionId = Math.random().toString(36).substring(2, 9);
   console.log(`\n--- [Début de la transaction: ${transactionId}] ---`);
+
+  // Log de débogage pour voir si la requête arrive bien
+  console.log(`[${transactionId}] Requête reçue sur /api/webhook.`);
+  console.log(`[${transactionId}] Corps de la requête: ${JSON.stringify(req.body)}`);
 
   // Création de l'entrée pour notre interface de suivi
   const logEntry = {
@@ -112,7 +129,12 @@ async function handleWebhookRequest(req, res) {
         logEntry.error = "Timeout lors de l'appel à Google Apps Script.";
       }
       console.error(`[${transactionId}] ERREUR lors de l'appel à Google Apps Script:`, scriptError.message);
-      logEntry.error = logEntry.error || scriptError.message;
+      // Ajouter plus de détails sur l'erreur axios si disponible
+      if (scriptError.response) {
+        logEntry.error = `Erreur ${scriptError.response.status}: ${scriptError.response.data}`;
+      } else {
+        logEntry.error = logEntry.error || scriptError.message;
+      }
     }
 
     // 3. Renvoyer la réponse à WhatsAuto dans le format attendu
