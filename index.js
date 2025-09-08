@@ -28,50 +28,63 @@ app.get('/api/webhook', (req, res) => {
 });
 
 // Route pour recevoir les notifications de messages de WhatsApp
-app.post('/api/webhook', async (req, res) => { // Cette route est maintenant appelée par WhatsAuto
+app.post('/api/webhook', async (req, res) => {
+  // Création d'un ID unique pour chaque transaction pour un suivi facile dans les logs
+  const transactionId = Math.random().toString(36).substring(2, 9);
+  console.log(`\n--- [Début de la transaction: ${transactionId}] ---`);
+
   try {
     // 1. Analyser le corps de la requête venant de WhatsAuto
     const { phone, message, sender } = req.body;
-    console.log(`Message reçu de WhatsAuto: De ${sender} (${phone}), Message: "${message}"`);
+    console.log(`[${transactionId}] Requête reçue de l'auteur: ${sender || 'Inconnu'} (${phone})`);
+    console.log(`[${transactionId}] Message original: "${message}"`);
 
     if (!phone || !message) {
-      console.error('Requête invalide de WhatsAuto: "phone" ou "message" manquant.');
+      console.error(`[${transactionId}] ERREUR: Requête invalide, "phone" ou "message" manquant.`);
       return res.status(400).json({ error: 'Invalid request' });
     }
 
     // 2. Appeler Google Apps Script pour obtenir la réponse intelligente
-    let replyMessage = "Désolé, une erreur est survenue."; // Réponse par défaut
+    let replyMessage = "Désolé, une erreur est survenue.";
 
     try {
+      console.log(`[${transactionId}] Envoi des données à Google Apps Script pour analyse...`);
       const { data: scriptResponse } = await axios.post(process.env.APP_SCRIPT_URL, {
         from: phone,
         message: message,
         senderName: sender // On peut passer le nom de l'expéditeur aussi
+      }, {
+        timeout: 8000 // Ajout d'un timeout de 8 secondes
       });
 
-      console.log('Réponse reçue de Google Apps Script:', JSON.stringify(scriptResponse));
+      console.log(`[${transactionId}] Réponse reçue de Google Apps Script:`, JSON.stringify(scriptResponse));
 
       // Extraire la réponse du script
       if (scriptResponse && scriptResponse.status === 'success' && scriptResponse.reply) {
         replyMessage = scriptResponse.reply;
       }
     } catch (scriptError) {
-      console.error('Erreur lors de l\'appel à Google Apps Script:', scriptError.message);
+      if (scriptError.code === 'ECONNABORTED') {
+        console.error(`[${transactionId}] ERREUR: Le script Google Apps n'a pas répondu dans le temps imparti (timeout).`);
+      }
+      console.error(`[${transactionId}] ERREUR lors de l'appel à Google Apps Script:`, scriptError.message);
       // On utilisera la réponse par défaut
     }
 
     // 3. Renvoyer la réponse à WhatsAuto dans le format attendu
-    console.log(`Envoi de la réponse à WhatsAuto: "${replyMessage}"`);
+    console.log(`[${transactionId}] Envoi de la réponse finale à WhatsAuto: "${replyMessage}"`);
     res.status(200).json({
       reply: replyMessage
     });
+    console.log(`--- [Fin de la transaction: ${transactionId}] ---`);
 
   } catch (error) {
-    console.error('Erreur globale dans le traitement du webhook:', error.message);
+    console.error(`[${transactionId}] ERREUR globale dans le traitement du webhook:`, error.message);
     // En cas d'erreur imprévue, renvoyer une réponse par défaut pour ne pas bloquer WhatsAuto
     res.status(200).json({
       reply: "Une erreur interne est survenue."
     });
+    console.log(`--- [Fin de la transaction avec ERREUR: ${transactionId}] ---`);
   }
 });
 
