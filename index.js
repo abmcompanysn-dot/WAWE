@@ -120,6 +120,7 @@ async function handleWebhookRequest(req, res) {
         // on envoie une réponse minimale (un point) pour éviter l'erreur "null" de WhatsAuto.
         replyMessage = String(scriptResponse.reply).trim() === '' ? '.' : scriptResponse.reply;
       } else {
+        logEntry.error = "La réponse du script Google était invalide ou vide.";
         // Si le script n'a pas renvoyé de réponse valide, on ne renvoie rien d'utile pour l'utilisateur.
         replyMessage = '.'; // On envoie un point pour s'assurer que la réponse n'est jamais vide.
       }
@@ -127,6 +128,7 @@ async function handleWebhookRequest(req, res) {
       if (scriptError.code === 'ECONNABORTED') {
         console.error(`[${transactionId}] ERREUR: Le script Google Apps n'a pas répondu dans le temps imparti (timeout).`);
         logEntry.error = "Timeout lors de l'appel à Google Apps Script.";
+        logEntry.status = 'Erreur';
       }
       console.error(`[${transactionId}] ERREUR lors de l'appel à Google Apps Script:`, scriptError.message);
       // Ajouter plus de détails sur l'erreur axios si disponible
@@ -135,12 +137,12 @@ async function handleWebhookRequest(req, res) {
       } else {
         logEntry.error = logEntry.error || scriptError.message;
       }
+      logEntry.status = 'Erreur';
     }
 
     // 3. Renvoyer la réponse à WhatsAuto dans le format attendu
     console.log(`[${transactionId}] Envoi de la réponse finale à WhatsAuto: "${replyMessage}"`);
     logEntry.response.message = replyMessage;
-    logEntry.status = 'Terminé';
     res.status(200).json({
       reply: replyMessage
     });
