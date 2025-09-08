@@ -96,7 +96,9 @@ async function handleWebhookRequest(req, res) {
       console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
       logEntry.status = 'Échoué';
       logEntry.error = errorMsg;
-      return res.status(400).json({ error: 'Invalid request' });
+      // On renvoie une réponse au format attendu par WhatsAuto pour un meilleur débogage
+      // au lieu de l'erreur "null", vous verrez ce message d'erreur dans WhatsAuto.
+      return res.status(200).json({ reply: `ERREUR: ${errorMsg}` });
     }
 
     // 2. Appeler Google Apps Script pour obtenir la réponse intelligente
