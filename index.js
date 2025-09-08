@@ -12,7 +12,7 @@ app.get('/', (req, res) => {
 });
 
 // Route pour la vérification du webhook par Meta (Facebook)
-app.get('/webhook', (req, res) => {
+app.get('/api/webhook', (req, res) => {
   // Le jeton de vérification est maintenant défini directement dans le code.
   const VERIFY_TOKEN = '123456';
   const mode = req.query['hub.mode'];
@@ -28,7 +28,7 @@ app.get('/webhook', (req, res) => {
 });
 
 // Route pour recevoir les notifications de messages de WhatsApp
-app.post('/webhook', async (req, res) => {
+app.post('/api/webhook', async (req, res) => {
   try {
     const { entry } = req.body;
     console.log('Corps de la requête reçu:', JSON.stringify(req.body, null, 2));
