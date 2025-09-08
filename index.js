@@ -27,7 +27,7 @@ app.get('/', (req, res) => {
   res.send('Le serveur de webhook est actif.');
 });
 
-// Nouvelle route pour l'interface de suivi en direct
+// Nouvelle route pour l'API de statut (données JSON)
 app.get('/api/status', (req, res) => {
   console.log("[STATUS] La route /api/status a été appelée."); // Log de débogage
   res.status(200).json({
@@ -36,34 +36,16 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Nouvelle route pour l'interface de suivi en direct (HTML)
+// Nouvelle route pour le tableau de bord visuel (HTML)
 app.get('/api/dashboard', (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(dashboardHtmlContent);
 });
 
-// --- Routes Webhook ---
-// On regroupe les routes GET et POST pour /api/webhook pour une meilleure robustesse.
-app.route('/api/webhook')
-  .get((req, res) => {
-    // Cette route est utilisée pour la vérification initiale (par Meta ou autre).
-    const VERIFY_TOKEN = '123456';
-    const mode = req.query['hub.mode'];
-    const token = req.query['hub.verify_token'];
-    const challenge = req.query['hub.challenge'];
-
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-      console.log('WEBHOOK_VERIFIED');
-      res.status(200).send(challenge);
-    } else {
-      console.log('WEBHOOK_VERIFICATION_FAILED');
-      res.sendStatus(403);
-    }
-  })
-  .post(async (req, res) => {
-    // Cette route reçoit les requêtes de WhatsAuto.
-    // Le code ci-dessous est le même qu'avant.
-
+/**
+ * Gère une requête entrante du webhook WhatsAuto.
+ */
+async function handleWebhookRequest(req, res) {
   // Création d'un ID unique pour chaque transaction pour un suivi facile dans les logs
   const transactionId = Math.random().toString(36).substring(2, 9);
   console.log(`\n--- [Début de la transaction: ${transactionId}] ---`);
@@ -72,18 +54,18 @@ app.route('/api/webhook')
   const logEntry = {
     transaction: transactionId,
     timestamp: new Date().toISOString(),
-    statut: 'En cours',
-    auteur: {
+    status: 'En cours',
+    author: {
       phone: req.body.phone || 'N/A',
       name: req.body.sender || 'Inconnu'
     },
-    requete: {
+    request: {
       message: req.body.message || ''
     },
-    reponse: {
+    response: {
       message: null
     },
-    erreur: null
+    error: null
   };
 
   try {
@@ -95,8 +77,8 @@ app.route('/api/webhook')
     if (!phone || !message) {
       const errorMsg = 'Requête invalide, "phone" ou "message" manquant.';
       console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
-      logEntry.statut = 'Échoué';
-      logEntry.erreur = errorMsg;
+      logEntry.status = 'Échoué';
+      logEntry.error = errorMsg;
       return res.status(400).json({ error: 'Invalid request' });
     }
 
@@ -159,7 +141,17 @@ app.route('/api/webhook')
       liveLogs.pop();
     }
   }
-  });
+}
+
+// --- Routes Webhook ---
+// On regroupe les routes GET et POST pour /api/webhook pour une meilleure robustesse.
+app.route('/api/webhook')
+  .get((req, res) => {
+    // Cette route peut être utilisée pour un simple test de connectivité.
+    // La logique de vérification de Meta a été retirée car elle n'est plus nécessaire.
+    res.status(200).send('Webhook endpoint is active and ready to receive POST requests from WhatsAuto.');
+  })
+  .post(handleWebhookRequest);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Serveur actif sur http://localhost:${PORT}`));
