@@ -28,100 +28,50 @@ app.get('/api/webhook', (req, res) => {
 });
 
 // Route pour recevoir les notifications de messages de WhatsApp
-app.post('/api/webhook', async (req, res) => {
+app.post('/api/webhook', async (req, res) => { // Cette route est maintenant appelée par WhatsAuto
   try {
-    const { entry } = req.body;
-    console.log('Corps de la requête reçu:', JSON.stringify(req.body, null, 2));
+    // 1. Analyser le corps de la requête venant de WhatsAuto
+    const { phone, message, sender } = req.body;
+    console.log(`Message reçu de WhatsAuto: De ${sender} (${phone}), Message: "${message}"`);
 
-    const message = entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-
-    if (message) {
-      const from = message.from;
-      const type = message.type;
-      let userMessage; // Le contenu ou l'ID que nous allons traiter
-
-      // Rendre le système intelligent : il comprend le texte ET les clics sur les boutons/listes
-      if (type === 'text') {
-        userMessage = message.text.body;
-      } else if (type === 'interactive') {
-        const interactiveType = message.interactive.type;
-
-        if (interactiveType === 'list_reply') {
-          // L'utilisateur a cliqué sur un élément d'une liste
-          userMessage = message.interactive.list_reply.id;
-          console.log(`Réponse de liste reçue, ID: ${userMessage}`);
-        } else if (interactiveType === 'button_reply') {
-          // L'utilisateur a cliqué sur un bouton
-          userMessage = message.interactive.button_reply.id;
-          console.log(`Réponse de bouton reçue, ID: ${userMessage}`);
-        }
-      }
-
-      if (userMessage && from) {
-        // --- Étape 1 : Enregistrer le message via l'API Google Apps Script ---
-        try {
-          await axios.post(process.env.APP_SCRIPT_URL, {
-            timestamp: new Date().toISOString(),
-            from: from,
-            message: userMessage // On envoie le texte ou l'ID de l'interaction
-          });
-          console.log('Message enregistré dans Google Sheets.');
-        } catch (scriptError) {
-          console.error('Erreur lors de l\'envoi des données à Google Apps Script:', scriptError.message);
-        }
-
-        // --- Étape 2 : Obtenir la réponse à envoyer depuis l'API ---
-        let whatsappPayload;
-
-        try {
-          // On appelle notre API en GET avec des paramètres dans l'URL
-          const { data: replyData } = await axios.get(process.env.APP_SCRIPT_URL, {
-            params: {
-              action: 'findReply',
-              keyword: userMessage, // On utilise le texte ou l'ID comme mot-clé
-              from: from
-            }
-          });
-
-          console.log('Réponse reçue de l\'API Google:', JSON.stringify(replyData));
-
-          // Construire le payload WhatsApp en fonction du type de réponse
-          if (replyData.status === 'success') {
-            if (replyData.type === 'text') {
-              whatsappPayload = { to: from, text: { body: replyData.content } };
-            } else if (replyData.type === 'interactive') {
-              whatsappPayload = { to: from, type: 'interactive', interactive: replyData.content };
-            }
-          }
-        } catch (readError) {
-          console.error('Erreur lors de la lecture depuis Google Apps Script:', readError.message);
-        }
-
-        // --- Étape 3 : Envoyer la réponse à l'utilisateur via WhatsApp ---
-        if (whatsappPayload) {
-          await axios.post(`https://graph.facebook.com/v19.0/${process.env.PHONE_NUMBER_ID}/messages`, 
-            {
-              messaging_product: 'whatsapp',
-              ...whatsappPayload
-            }, 
-            {
-              headers: {
-                Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-          console.log('Réponse envoyée à WhatsApp.');
-        }
-      }
+    if (!phone || !message) {
+      console.error('Requête invalide de WhatsAuto: "phone" ou "message" manquant.');
+      return res.status(400).json({ error: 'Invalid request' });
     }
 
-    // Répondre 200 OK à Meta pour indiquer que la notification a été reçue.
-    res.sendStatus(200);
+    // 2. Appeler Google Apps Script pour obtenir la réponse intelligente
+    let replyMessage = "Désolé, une erreur est survenue."; // Réponse par défaut
+
+    try {
+      const { data: scriptResponse } = await axios.post(process.env.APP_SCRIPT_URL, {
+        from: phone,
+        message: message,
+        senderName: sender // On peut passer le nom de l'expéditeur aussi
+      });
+
+      console.log('Réponse reçue de Google Apps Script:', JSON.stringify(scriptResponse));
+
+      // Extraire la réponse du script
+      if (scriptResponse && scriptResponse.status === 'success' && scriptResponse.reply) {
+        replyMessage = scriptResponse.reply;
+      }
+    } catch (scriptError) {
+      console.error('Erreur lors de l\'appel à Google Apps Script:', scriptError.message);
+      // On utilisera la réponse par défaut
+    }
+
+    // 3. Renvoyer la réponse à WhatsAuto dans le format attendu
+    console.log(`Envoi de la réponse à WhatsAuto: "${replyMessage}"`);
+    res.status(200).json({
+      reply: replyMessage
+    });
+
   } catch (error) {
-    console.error('Erreur lors du traitement du webhook:', error.response ? error.response.data : error.message);
-    // Il est important de répondre 200 même en cas d'erreur pour que Meta ne désactive pas le webhook.
-    res.sendStatus(200);
+    console.error('Erreur globale dans le traitement du webhook:', error.message);
+    // En cas d'erreur imprévue, renvoyer une réponse par défaut pour ne pas bloquer WhatsAuto
+    res.status(200).json({
+      reply: "Une erreur interne est survenue."
+    });
   }
 });
 
