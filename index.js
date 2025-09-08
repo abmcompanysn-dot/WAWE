@@ -63,17 +63,26 @@ async function handleWebhookRequest(req, res) {
   const transactionId = Math.random().toString(36).substring(2, 9);
   console.log(`\n--- [Début de la transaction: ${transactionId}] ---`);
 
+  // 1. Reconnaître et extraire les paramètres de la demande de WhatsAuto
+  const {
+    phone,
+    message,
+    sender,
+    app,
+    group_name
+  } = req.body;
+
   // Création de l'entrée pour notre interface de suivi
   const logEntry = {
     transaction: transactionId,
     timestamp: new Date().toISOString(),
     status: 'En cours',
     author: {
-      phone: req.body.phone || 'N/A',
-      name: req.body.sender || 'Inconnu'
+      phone: phone || 'N/A',
+      name: sender || 'Inconnu'
     },
     request: {
-      message: req.body.message || ''
+      message: message || ''
     },
     response: {
       message: null
@@ -82,10 +91,10 @@ async function handleWebhookRequest(req, res) {
   };
 
   try {
-    const { phone, message, sender } = req.body;
-    console.log(`[${transactionId}] Requête reçue sur /api/webhook. Auteur: ${sender || 'Inconnu'} (${phone}), Message: "${message}"`);
+    console.log(`[${transactionId}] Requête reçue sur /api/webhook. Auteur: ${sender || 'Inconnu'} (${phone}), App: ${app || 'N/A'}, Groupe: ${group_name || 'N/A'}`);
+    console.log(`[${transactionId}] Message original: "${message}"`);
 
-    // 1. Validation des données d'entrée
+    // 2. Validation des données essentielles
     if (!phone || !message) {
       const errorMsg = 'Requête invalide, "phone" ou "message" manquant.';
       console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
@@ -96,7 +105,7 @@ async function handleWebhookRequest(req, res) {
       return res.status(200).json({ reply: `ERREUR: ${errorMsg}` });
     }
 
-    // 2. Appeler Google Apps Script pour obtenir la réponse intelligente
+    // 3. Appeler Google Apps Script pour obtenir la réponse intelligente
     let replyMessage = "Désolé, une erreur est survenue."; // Réponse par défaut
 
     try {
@@ -135,7 +144,7 @@ async function handleWebhookRequest(req, res) {
       }
     }
 
-    // 3. Renvoyer la réponse à WhatsAuto dans le format attendu
+    // 4. Renvoyer la réponse à WhatsAuto dans le format attendu
     console.log(`[${transactionId}] Envoi de la réponse finale à WhatsAuto: "${replyMessage}"`);
     logEntry.response.message = replyMessage;
     res.status(200).json({
