@@ -27,24 +27,9 @@ app.get('/', (req, res) => {
   res.send('Le serveur de webhook est actif.');
 });
 
-// Route pour la vérification du webhook par Meta (Facebook)
-app.get('/api/webhook', (req, res) => {
-  // Le jeton de vérification est maintenant défini directement dans le code.
-  const VERIFY_TOKEN = '123456';
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-
-  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-    console.log('WEBHOOK_VERIFIED');
-    res.status(200).send(challenge);
-  } else {
-    res.sendStatus(403);
-  }
-});
-
 // Nouvelle route pour l'interface de suivi en direct
 app.get('/api/status', (req, res) => {
+  console.log("[STATUS] La route /api/status a été appelée."); // Log de débogage
   res.status(200).json({
     serverStatus: 'Actif',
     transactionsRecentes: liveLogs
@@ -57,8 +42,28 @@ app.get('/api/dashboard', (req, res) => {
   res.send(dashboardHtmlContent);
 });
 
-// Route pour recevoir les requêtes de WhatsAuto
-app.post('/api/webhook', async (req, res) => {
+// --- Routes Webhook ---
+// On regroupe les routes GET et POST pour /api/webhook pour une meilleure robustesse.
+app.route('/api/webhook')
+  .get((req, res) => {
+    // Cette route est utilisée pour la vérification initiale (par Meta ou autre).
+    const VERIFY_TOKEN = '123456';
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      console.log('WEBHOOK_VERIFIED');
+      res.status(200).send(challenge);
+    } else {
+      console.log('WEBHOOK_VERIFICATION_FAILED');
+      res.sendStatus(403);
+    }
+  })
+  .post(async (req, res) => {
+    // Cette route reçoit les requêtes de WhatsAuto.
+    // Le code ci-dessous est le même qu'avant.
+
   // Création d'un ID unique pour chaque transaction pour un suivi facile dans les logs
   const transactionId = Math.random().toString(36).substring(2, 9);
   console.log(`\n--- [Début de la transaction: ${transactionId}] ---`);
@@ -110,8 +115,11 @@ app.post('/api/webhook', async (req, res) => {
 
       console.log(`[${transactionId}] Réponse reçue de Google Apps Script:`, JSON.stringify(scriptResponse));
 
-      if (scriptResponse && scriptResponse.status === 'success' && scriptResponse.reply) {
-        replyMessage = scriptResponse.reply;
+      // Vérifier si la réponse du script est valide
+      if (scriptResponse && scriptResponse.status === 'success' && typeof scriptResponse.reply !== 'undefined') {
+        // S'assurer que la réponse n'est jamais null ou vide, ce qui peut causer des erreurs dans WhatsAuto.
+        // On envoie un espace si la réponse est vide ou null.
+        replyMessage = scriptResponse.reply || " ";
       }
     } catch (scriptError) {
       if (scriptError.code === 'ECONNABORTED') {
@@ -148,7 +156,7 @@ app.post('/api/webhook', async (req, res) => {
       liveLogs.pop();
     }
   }
-});
+  });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Serveur actif sur http://localhost:${PORT}`));
