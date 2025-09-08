@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const axios = require('axios');
 
 const app = express();
@@ -7,6 +9,15 @@ const app = express();
 app.use(express.json());
 
 // --- Interface de suivi en direct ---
+// Lire le fichier dashboard.html une seule fois au démarrage pour garantir sa disponibilité sur Vercel
+let dashboardHtmlContent;
+try {
+  dashboardHtmlContent = fs.readFileSync(path.join(__dirname, 'dashboard.html'), 'utf8');
+} catch (error) {
+  console.error("Erreur critique: Impossible de charger le fichier dashboard.html. Le tableau de bord sera indisponible.", error);
+  dashboardHtmlContent = "<h1>Erreur 500</h1><p>Le fichier du tableau de bord n'a pas pu être chargé.</p>";
+}
+
 // Stocke les 50 dernières transactions en mémoire.
 const liveLogs = [];
 const MAX_LOGS = 50;
@@ -38,6 +49,12 @@ app.get('/api/status', (req, res) => {
     serverStatus: 'Actif',
     transactionsRecentes: liveLogs
   });
+});
+
+// Nouvelle route pour l'interface de suivi en direct (HTML)
+app.get('/api/dashboard', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(dashboardHtmlContent);
 });
 
 // Route pour recevoir les requêtes de WhatsAuto
