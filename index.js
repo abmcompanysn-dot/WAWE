@@ -87,7 +87,8 @@ async function handleWebhookRequest(req, res) {
       message: message || ''
     },
     response: {
-      message: null
+      message: null,
+      source: null
     },
     error: null
   };
@@ -102,13 +103,17 @@ async function handleWebhookRequest(req, res) {
       console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
       logEntry.status = 'Échoué';
       logEntry.error = errorMsg;
+      const reply = `ERREUR: ${errorMsg}`;
+      logEntry.response.message = reply;
+      logEntry.response.source = 'Serveur (Validation)';
       // On renvoie une réponse au format attendu par WhatsAuto pour un meilleur débogage
       // au lieu de l'erreur "null", vous verrez ce message d'erreur dans WhatsAuto.
-      return res.status(200).json({ reply: `ERREUR: ${errorMsg}` });
+      return res.status(200).json({ reply: reply });
     }
 
     // 3. Appeler Google Apps Script pour obtenir la réponse intelligente
     let replyMessage = "Désolé, une erreur est survenue."; // Réponse par défaut
+    logEntry.response.source = 'Serveur (Erreur par défaut)'; // Source par défaut
 
     try {
       console.log(`[${transactionId}] Envoi des données à Google Apps Script pour analyse...`);
@@ -117,7 +122,7 @@ async function handleWebhookRequest(req, res) {
         message: message,
         senderName: sender
       }, {
-        timeout: 8000 // Ajout d'un timeout de 8 secondes
+        timeout: 25000 // Timeout étendu à 25 secondes pour laisser le temps au script Google de répondre.
       });
 
       console.log(`[${transactionId}] Réponse reçue de Google Apps Script:`, JSON.stringify(scriptResponse));
@@ -125,24 +130,29 @@ async function handleWebhookRequest(req, res) {
       // Vérifier si la réponse du script est valide
       if (scriptResponse?.status === 'success' && scriptResponse.reply) {
         replyMessage = scriptResponse.reply;
+        logEntry.response.source = 'Google Apps Script';
       } else {
         logEntry.error = `La réponse du script Google était invalide ou vide. Reçu: ${JSON.stringify(scriptResponse)}`;
         replyMessage = '.'; // Réponse minimale pour éviter l'erreur "null" dans WhatsAuto
+        logEntry.response.source = 'Serveur (Fallback)';
       }
     } catch (scriptError) {
       logEntry.status = 'Erreur';
       if (scriptError.code === 'ECONNABORTED') {
-        const errorMsg = "Timeout lors de l'appel à Google Apps Script.";
+        const errorMsg = "Timeout (25s) dépassé lors de l'appel à Google Apps Script. Le script est trop lent.";
         console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
         logEntry.error = errorMsg;
+        logEntry.response.source = 'Serveur (Timeout)';
       } else if (scriptError.response) {
         const errorMsg = `Erreur ${scriptError.response.status} de Google: ${JSON.stringify(scriptError.response.data)}`;
         console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
         logEntry.error = errorMsg;
+        logEntry.response.source = 'Serveur (Erreur Google)';
       } else {
         const errorMsg = `Erreur de connexion avec Google Script: ${scriptError.message}`;
         console.error(`[${transactionId}] ERREUR: ${errorMsg}`);
         logEntry.error = errorMsg;
+        logEntry.response.source = 'Serveur (Erreur Connexion)';
       }
     }
 
@@ -159,9 +169,11 @@ async function handleWebhookRequest(req, res) {
     console.error(`[${transactionId}] ERREUR globale dans le traitement du webhook:`, errorMsg);
     logEntry.status = 'Erreur';
     logEntry.error = errorMsg;
-    logEntry.response.message = "Une erreur interne est survenue.";
+    const reply = "Une erreur interne est survenue.";
+    logEntry.response.message = reply;
+    logEntry.response.source = 'Serveur (Erreur Globale)';
     res.status(200).json({
-      reply: "Une erreur interne est survenue."
+      reply: reply
     });
     console.log(`--- [Fin de la transaction avec ERREUR: ${transactionId}] ---`);
   } finally {
