@@ -112,7 +112,7 @@ async function handleWebhookRequest(req, res) {
     }
 
     // 3. Appeler Google Apps Script pour obtenir la réponse intelligente
-    let replyMessage = "Désolé, une erreur est survenue."; // Réponse par défaut
+    let replyMessage = "Votre requête est prise en compte et sera gérée par un de nos agents professionnels."; // Réponse de secours unifiée
     logEntry.response.source = 'Serveur (Erreur par défaut)'; // Source par défaut
 
     try {
@@ -169,7 +169,7 @@ async function handleWebhookRequest(req, res) {
     console.error(`[${transactionId}] ERREUR globale dans le traitement du webhook:`, errorMsg);
     logEntry.status = 'Erreur';
     logEntry.error = errorMsg;
-    const reply = "Une erreur interne est survenue.";
+    const reply = "Votre requête est prise en compte et sera gérée par un de nos agents professionnels.";
     logEntry.response.message = reply;
     logEntry.response.source = 'Serveur (Erreur Globale)';
     res.status(200).json({
