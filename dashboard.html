@@ -70,6 +70,7 @@
                 <th>Auteur</th>
                 <th>Requête</th>
                 <th>Réponse</th>
+                <th>Source</th>
                 <th>Statut</th>
             </tr>
         </thead>
@@ -99,6 +100,9 @@
                     // Formater la date pour être plus lisible
                     const timestamp = new Date(log.timestamp).toLocaleString('fr-FR');
 
+                    // Gérer la source de la réponse
+                    const source = log.response.source || 'N/A';
+
                     // Définir la classe CSS pour le statut
                     const statusClass = 'status-' + log.status.toLowerCase().replace('é', 'e');
 
@@ -111,6 +115,7 @@
                         </td>
                         <td><pre>${log.request.message}</pre></td>
                         <td><pre>${log.response.message || ''}</pre></td>
+                        <td>${source}</td>
                         <td><div class="status ${statusClass}">${log.status}</div></td>
                     `;
                 });
