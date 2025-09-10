@@ -93,6 +93,7 @@ async function handleWebhookRequest(req, res) {
     error: null
   };
 
+  let googleAppsScriptReply = null;
   try {
     console.log(`[${transactionId}] Requête reçue sur /api/webhook. Auteur: ${sender || 'Inconnu'} (${phone}), App: ${app || 'N/A'}, Groupe: ${group_name || 'N/A'}`);
     console.log(`[${transactionId}] Message original: "${message}"`);
@@ -115,7 +116,7 @@ async function handleWebhookRequest(req, res) {
     let replyMessage = "Votre requête est prise en compte et sera gérée par un de nos agents professionnels."; // Réponse de secours unifiée
     logEntry.response.source = 'Serveur (Erreur par défaut)'; // Source par défaut
 
-    try {
+      try {
       console.log(`[${transactionId}] Envoi des données à Google Apps Script pour analyse...`);
       const { data: scriptResponse } = await axios.post(process.env.APP_SCRIPT_URL, {
         from: phone,
@@ -129,10 +130,11 @@ async function handleWebhookRequest(req, res) {
 
       // Vérifier si la réponse du script est valide
       if (scriptResponse?.status === 'success' && scriptResponse.reply) {
-        replyMessage = scriptResponse.reply;
+        googleAppsScriptReply = scriptResponse.reply;
         logEntry.response.source = 'Google Apps Script';
       } else {
         logEntry.error = `La réponse du script Google était invalide ou vide. Reçu: ${JSON.stringify(scriptResponse)}`;
+        googleAppsScriptReply = ".";
         replyMessage = '.'; // Réponse minimale pour éviter l'erreur "null" dans WhatsAuto
         logEntry.response.source = 'Serveur (Fallback)';
       }
@@ -154,6 +156,11 @@ async function handleWebhookRequest(req, res) {
         logEntry.error = errorMsg;
         logEntry.response.source = 'Serveur (Erreur Connexion)';
       }
+    } finally {
+       if (googleAppsScriptReply === "Désolé, je n'ai pas compris. Envoyez 'aide' pour voir les options") {
+        replyMessage = "Merci pour votre message. Notre équipe s’en occupe avec attention. Pour éviter toute confusion, nous vous recommandons de patienter jusqu’à la résolution avant d’envoyer une autre demande.";
+       } else if (googleAppsScriptReply != null) {
+           replyMessage = googleAppsScriptReply;
     }
 
     // 4. Renvoyer la réponse à WhatsAuto dans le format attendu
@@ -169,7 +176,7 @@ async function handleWebhookRequest(req, res) {
     console.error(`[${transactionId}] ERREUR globale dans le traitement du webhook:`, errorMsg);
     logEntry.status = 'Erreur';
     logEntry.error = errorMsg;
-    let reply = "Votre requête est prise en compte et sera gérée par un de nos agents professionnels."; // Standard Response
+    let reply = "Votre requête est prise en compte et sera gérée par un de nos agents."; // Standard Response
     // Override reply if the error message matches the specific "Désolé" message
     if (errorMsg.includes("Désolé, je n'ai pas compris. Envoyez 'aide' pour voir les options")) {
       reply = "Merci pour votre message. Notre équipe s’en occupe avec attention. Pour éviter toute confusion, nous vous recommandons de patienter jusqu’à la résolution avant d’envoyer une autre demande.";
