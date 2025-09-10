@@ -156,7 +156,7 @@ async function handleWebhookRequest(req, res) {
         logEntry.error = errorMsg;
         logEntry.response.source = 'Serveur (Erreur Connexion)';
       }
-    } finally {
+    } 
        if (googleAppsScriptReply === "Désolé, je n'ai pas compris. Envoyez 'aide' pour voir les options") {
         replyMessage = "Merci pour votre message. Notre équipe s’en occupe avec attention. Pour éviter toute confusion, nous vous recommandons de patienter jusqu’à la résolution avant d’envoyer une autre demande.";
        } else if (googleAppsScriptReply != null) {
