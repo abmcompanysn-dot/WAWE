@@ -176,11 +176,6 @@ async function handleWebhookRequest(req, res) {
     console.error(`[${transactionId}] ERREUR globale dans le traitement du webhook:`, errorMsg);
     logEntry.status = 'Erreur';
     logEntry.error = errorMsg;
-    let reply = "Votre requête est prise en compte et sera gérée par un de nos agents."; // Standard Response
-    // Override reply if the error message matches the specific "Désolé" message
-    if (errorMsg.includes("Désolé, je n'ai pas compris. Envoyez 'aide' pour voir les options")) {
-      reply = "Merci pour votre message. Notre équipe s’en occupe avec attention. Pour éviter toute confusion, nous vous recommandons de patienter jusqu’à la résolution avant d’envoyer une autre demande.";
-    }
 
     logEntry.response.message = reply;
     logEntry.response.source = 'Serveur (Erreur Globale)';
